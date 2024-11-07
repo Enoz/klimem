@@ -1,0 +1,89 @@
+#include <linux/cdev.h> // For character device
+#include <linux/fs.h>   // For file operations structure
+#include <linux/init.h>
+#include <linux/ioctl.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/uaccess.h> // For copy_to_user, copy_from_user
+
+struct T_RPM {
+    int tVal1;
+    int tVal2;
+};
+
+#define DEVICE_NAME "/dev/klimem_dev"
+#define MY_IOCTL_MAGIC 'k'
+#define IOCTL_RPM _IOW(MY_IOCTL_MAGIC, 1, struct T_RPM)
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Enoz");
+MODULE_DESCRIPTION("Kaylee mem");
+
+// Device variables
+static int major;
+static struct cdev my_cdev;
+
+// ioctl handler
+static long ioctl_handler(struct file *file, unsigned int cmd,
+                          unsigned long arg) {
+
+    struct T_RPM rpmVal;
+
+    switch (cmd) {
+    case IOCTL_RPM:
+        if (copy_from_user(&rpmVal, (int __user *)arg, sizeof(struct T_RPM))) {
+            return -EFAULT;
+        }
+        printk(KERN_INFO "RPM Receieved, %d, %d\n", rpmVal.tVal1, rpmVal.tVal2);
+        break;
+
+    default:
+        return -ENOTTY;
+    }
+
+    return 0;
+}
+
+// File operations
+static struct file_operations fops = {
+    .owner = THIS_MODULE,
+    .unlocked_ioctl = ioctl_handler,
+};
+
+static int __init my_module_init(void) {
+    dev_t dev;
+    int ret;
+
+    // Allocate major number
+    ret = alloc_chrdev_region(&dev, 0, 1, DEVICE_NAME);
+    if (ret < 0) {
+        printk(KERN_ALERT "<klimem> Failed to allocate major number\n");
+        return ret;
+    }
+    major = MAJOR(dev);
+
+    // Initialize character device
+    cdev_init(&my_cdev, &fops);
+    my_cdev.owner = THIS_MODULE;
+
+    // Add character device to the system
+    ret = cdev_add(&my_cdev, dev, 1);
+    if (ret) {
+        printk(KERN_ALERT "<klimem> Failed to add cdev\n");
+        unregister_chrdev_region(dev, 1);
+        return ret;
+    }
+
+    printk(KERN_INFO "<klimem> Module initialized with major number %d\n",
+           major);
+    return 0;
+}
+
+static void __exit my_module_exit(void) {
+    cdev_del(&my_cdev);
+    unregister_chrdev_region(MKDEV(major, 0), 1);
+    printk(KERN_INFO "<klimem> Module exited\n");
+}
+
+module_init(my_module_init);
+module_exit(my_module_exit);
