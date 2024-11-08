@@ -17,8 +17,8 @@ int main() {
     }
 
     struct T_RPM toSend;
-    toSend.tVal1 = 3;
-    toSend.tVal2 = 6;
+    toSend.tVal1 = 5;
+    toSend.tVal2 = 13;
     if (ioctl(fd, IOCTL_RPM, &toSend) < 0) {
         perror("ioctl rpm set failed");
         close(fd);
