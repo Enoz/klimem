@@ -11,7 +11,12 @@ rm /dev/klimem_dev
 make clean
 
 # Install
+
 bear -- make
+# if ! command -v bear -- make
+# then
+#     make
+# fi
 insmod klimem.ko
 
 # Print magic number output

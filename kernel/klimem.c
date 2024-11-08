@@ -1,3 +1,4 @@
+#include "asm/current.h"
 #include <linux/cdev.h> // For character device
 #include <linux/fs.h>   // For file operations structure
 #include <linux/init.h>
@@ -28,13 +29,16 @@ static long ioctl_handler(struct file *file, unsigned int cmd,
                           unsigned long arg) {
 
     struct T_RPM rpmVal;
+    pid_t callerPid;
 
     switch (cmd) {
     case IOCTL_RPM:
         if (copy_from_user(&rpmVal, (int __user *)arg, sizeof(struct T_RPM))) {
             return -EFAULT;
         }
-        printk(KERN_INFO "RPM Receieved, %d, %d\n", rpmVal.tVal1, rpmVal.tVal2);
+        callerPid = current->pid;
+        printk(KERN_INFO "RPM Receieved from PID %i, %d, %d\n", callerPid,
+               rpmVal.tVal1, rpmVal.tVal2);
         break;
 
     default:

@@ -1,6 +1,8 @@
 #include "comm.c"
 
+#include <iostream>
 #include <stdio.h>
+#include <unistd.h>
 
 struct T_RPM {
     int tVal1;
@@ -8,6 +10,9 @@ struct T_RPM {
 };
 
 int main() {
+
+    printf("Current Pid: %i\n", getpid());
+
     int fd, val;
 
     fd = open(DEVICE_NAME, O_RDWR);
@@ -24,7 +29,6 @@ int main() {
         close(fd);
         return -1;
     }
-    
 
     close(fd);
     return 0;
