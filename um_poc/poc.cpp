@@ -1,4 +1,4 @@
-#include "../comm/comm.c"
+#include "comm.c"
 
 #include <stdio.h>
 
