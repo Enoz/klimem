@@ -1,4 +1,5 @@
 
+#include "linux/types.h"
 #ifndef KERNEL_SPACE
 
 #include <fcntl.h>
@@ -12,6 +13,8 @@
 #define IOCTL_RPM _IOW(MY_IOCTL_MAGIC, 1, struct T_RPM)
 
 struct T_RPM {
-    int tVal1;
-    int tVal2;
+    pid_t target_pid;
+    unsigned long target_address;
+    size_t read_size;
+    unsigned long buffer_address;
 };

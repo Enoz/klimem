@@ -17,8 +17,10 @@ int main() {
     }
 
     struct T_RPM toSend;
-    toSend.tVal1 = 5;
-    toSend.tVal2 = 13;
+    toSend.target_pid = 1234;
+    toSend.buffer_address = 0xDEADBEEF;
+    toSend.read_size = 128;
+    toSend.target_address = 0xDEADC0DE;
     if (ioctl(fd, IOCTL_RPM, &toSend) < 0) {
         perror("ioctl rpm set failed");
         close(fd);

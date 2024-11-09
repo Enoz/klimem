@@ -22,17 +22,19 @@ static struct cdev my_cdev;
 static long ioctl_handler(struct file *file, unsigned int cmd,
                           unsigned long arg) {
 
-    struct T_RPM rpmVal;
+    struct T_RPM rpm_val;
     pid_t callerPid;
 
     switch (cmd) {
     case IOCTL_RPM:
-        if (copy_from_user(&rpmVal, (int __user *)arg, sizeof(struct T_RPM))) {
+        if (copy_from_user(&rpm_val, (int __user *)arg, sizeof(struct T_RPM))) {
             return -EFAULT;
         }
         callerPid = current->pid;
-        printk(KERN_INFO "RPM Receieved from PID %i, %d, %d\n", callerPid,
-               rpmVal.tVal1, rpmVal.tVal2);
+        printk(KERN_INFO
+               "RPM Receieved (PID %i, target addr %lx, size %zu, local buff %lx)",
+               rpm_val.target_pid, rpm_val.target_address, rpm_val.read_size,
+               rpm_val.buffer_address);
         break;
 
     default:
