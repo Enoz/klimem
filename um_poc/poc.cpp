@@ -1,13 +1,8 @@
-#include "comm.c"
+#include "../comm/comm.c"
 
-#include <iostream>
 #include <stdio.h>
 #include <unistd.h>
 
-struct T_RPM {
-    int tVal1;
-    int tVal2;
-};
 
 int main() {
 

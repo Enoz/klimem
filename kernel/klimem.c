@@ -7,14 +7,8 @@
 #include <linux/module.h>
 #include <linux/uaccess.h> // For copy_to_user, copy_from_user
 
-struct T_RPM {
-    int tVal1;
-    int tVal2;
-};
-
-#define DEVICE_NAME "/dev/klimem_dev"
-#define MY_IOCTL_MAGIC 'k'
-#define IOCTL_RPM _IOW(MY_IOCTL_MAGIC, 1, struct T_RPM)
+#define KERNEL_SPACE
+#include "../comm/comm.c"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Enoz");
