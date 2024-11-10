@@ -1,27 +1,13 @@
-#include <linux/init.h>       // For module initialization macros
-#include <linux/mm.h>         // For memory management functions and structures
-#include <linux/module.h>     // For module macros and functions
-#include <linux/sched/task.h> // For task_struct and related task functions
-#include <linux/slab.h>       // For kmalloc and kfree
-#include <linux/uaccess.h> // For access_process_vm and user memory access functions
-
-#include "asm/current.h"
-#include "linux/gfp_types.h"
-#include "linux/kern_levels.h"
-#include "linux/mm_types.h"
-#include "linux/pid.h"
-#include "linux/pid_types.h"
-#include "linux/printk.h"
-#include "linux/sched.h"
-#include "linux/sched/mm.h"
-#include "linux/sched/task.h"
-#include <linux/cdev.h> // For character device
-#include <linux/fs.h>   // For file operations structure
+#include <linux/cdev.h>
 #include <linux/init.h>
-#include <linux/ioctl.h>
 #include <linux/kernel.h>
+#include <linux/mm.h>
+#include <linux/mm_types.h>
 #include <linux/module.h>
-#include <linux/uaccess.h> // For copy_to_user, copy_from_user
+#include <linux/pid.h>
+#include <linux/sched/task.h>
+#include <linux/slab.h>
+#include <linux/uaccess.h>
 
 #define KERNEL_SPACE
 #include "../comm/comm.c"
@@ -34,7 +20,7 @@ MODULE_DESCRIPTION("Kaylee mem");
 static int major;
 static struct cdev my_cdev;
 
-static int ReadProcessMemoryEx(struct T_RPM args) {
+static int ReadProcessMemory(struct T_RPM args) {
     pid_t reader_pid = current->pid;
     struct task_struct *target_task, *reader_task;
     struct mm_struct *target_mm, *reader_mm;
@@ -139,7 +125,7 @@ static long ioctl_handler(struct file *file, unsigned int cmd,
                          "%lx, size %zu, local buff %lx)",
                current->pid, rpm_val.target_pid, rpm_val.target_address,
                rpm_val.read_size, rpm_val.buffer_address);
-        ReadProcessMemoryEx(rpm_val);
+        ReadProcessMemory(rpm_val);
         break;
 
     default:
