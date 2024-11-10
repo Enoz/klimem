@@ -12,11 +12,12 @@ make clean
 
 # Install
 
-bear -- make
-# if ! command -v bear -- make
-# then
-#     make
-# fi
+if command -v bear
+then
+    bear -- make
+else
+    make
+fi
 insmod klimem.ko
 
 # Print magic number output
