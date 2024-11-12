@@ -79,10 +79,6 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
             strncpy(mods->modules[mods->numModules].path, path,
                     sizeof(mods->modules[mods->numModules].path));
 
-            // Print base address, end address, and module path
-            pr_info("<<klimem>> Base: 0x%lx, End: 0x%lx, Module: %s\n",
-                    vma->vm_start, vma->vm_end, path);
-
             mods->numModules++;
             kfree(path_buf);
         }
