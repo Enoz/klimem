@@ -46,6 +46,10 @@ int main() {
         return -1;
     }
     printf("Found %i processes\n", procVal.numProcesses);
+    
+    for(int i = 0; i < procVal.numProcesses; i++) {
+        printf("Proc %i: PID-%i Name: %s\n", i, procVal.processes[i].pid, procVal.processes[i].name);
+    }
 
     close(fd);
     return 0;

@@ -8,7 +8,7 @@
 
 #endif /* ifndef KERNEL_SPACE */
 
-#define MAX_PROCESSES_READ 10
+#define MAX_PROCESSES_READ 40
 #define DEVICE_NAME "/dev/klimem_dev"
 #define MY_IOCTL_MAGIC 'k'
 #define IOCTL_RPM _IOW(MY_IOCTL_MAGIC, 1, struct T_RPM)
