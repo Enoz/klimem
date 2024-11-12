@@ -25,6 +25,7 @@ int main() {
     to_send.read_size = sizeof(int);
     to_send.buffer_address = (unsigned long)readVal;
 
+    printf("Testing RPM::\n");
     printf("Value in testVal (0x%lx): %i\n", (unsigned long)&testVal, testVal);
 
     if (ioctl(fd, IOCTL_RPM, &to_send) < 0) {
@@ -34,6 +35,17 @@ int main() {
     }
 
     printf("Value in readVal (0x%lx): %i\n", (unsigned long)readVal, *readVal);
+
+
+
+    printf("Testing GetProcesses::\n");
+    struct T_PROCESSES procVal;
+    if (ioctl(fd, IOCTL_GET_PROCESSES, &procVal) < 0) {
+        perror("IOCTL GET PROCS failed");
+        close(fd);
+        return -1;
+    }
+    printf("Found %i processes\n", procVal.numProcesses);
 
     close(fd);
     return 0;

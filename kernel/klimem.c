@@ -1,3 +1,4 @@
+#include "linux/sched/signal.h"
 #include <linux/cdev.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -20,13 +21,28 @@ MODULE_DESCRIPTION("Kaylee mem");
 static int major;
 static struct cdev my_cdev;
 
+static struct T_PROCESSES GetProcesses(void) {
+    struct T_PROCESSES procs;
+
+    procs.numProcesses = 0;
+    struct task_struct *task;
+    for_each_process(task) {
+        if (procs.numProcesses == MAX_PROCESSES_READ) {
+            break;
+        }
+        procs.processes[procs.numProcesses].pid = task->pid;
+        strncpy(procs.processes[procs.numProcesses].name, task->comm, sizeof(procs.processes[procs.numProcesses].name));
+        procs.numProcesses++;
+    }
+    return procs;
+}
+
 static int ReadProcessMemory(struct T_RPM args) {
     pid_t reader_pid = current->pid;
     struct task_struct *target_task, *reader_task;
     struct mm_struct *target_mm, *reader_mm;
     char *buffer;
     int bytes_read, bytes_written;
-
     // Locate the target task
     target_task = get_pid_task(find_get_pid(args.target_pid), PIDTYPE_PID);
     if (!target_task) {
@@ -115,6 +131,7 @@ static long ioctl_handler(struct file *file, unsigned int cmd,
                           unsigned long arg) {
 
     struct T_RPM rpm_val;
+    struct T_PROCESSES procs;
 
     switch (cmd) {
     case IOCTL_RPM:
@@ -126,6 +143,14 @@ static long ioctl_handler(struct file *file, unsigned int cmd,
                current->pid, rpm_val.target_pid, rpm_val.target_address,
                rpm_val.read_size, rpm_val.buffer_address);
         ReadProcessMemory(rpm_val);
+        break;
+
+    case IOCTL_GET_PROCESSES:
+        procs = GetProcesses();
+        if (copy_to_user((int __user *)arg, &procs,
+                         sizeof(struct T_PROCESSES))) {
+            return -EFAULT;
+        }
         break;
 
     default:
