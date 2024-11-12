@@ -46,8 +46,6 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
         return;
     }
 
-    pr_info("<<klimem>> Listing modules for PID %d:\n", mod_req.pid);
-
     // Traverse the maple_tree for VMAs
     down_read(&mm->mmap_lock);
     while ((vma = mt_find(&mm->mm_mt, &index, ULONG_MAX))) {
@@ -90,7 +88,7 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
 
     mmput(mm);
     put_task_struct(task);
-    
+
     // Write to user
 
     pid_t reader_pid = current->pid;
@@ -114,19 +112,16 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
         return;
     }
 
-
-    int bytes_written = access_process_vm(
-        reader_task, mod_req.buffer_address, mods, sizeof(struct T_MODULES), FOLL_WRITE);
+    int bytes_written =
+        access_process_vm(reader_task, mod_req.buffer_address, mods,
+                          sizeof(struct T_MODULES), FOLL_WRITE);
     if (bytes_written < 0) {
         pr_err("<<klimem>> access_process_vm (write) failed\n");
-    } else {
-        pr_info("<<klimem>> Wrote %d bytes to process %d at address 0x%lx\n",
-                bytes_written, reader_pid, mod_req.buffer_address);
     }
     mmput(reader_mm);
     put_task_struct(reader_task);
     kfree(mods);
-    return ;
+    return;
 }
 
 static void GetProcesses(unsigned long proc_addr) {
@@ -168,9 +163,6 @@ static void GetProcesses(unsigned long proc_addr) {
         reader_task, proc_addr, procs, sizeof(struct T_PROCESSES), FOLL_WRITE);
     if (bytes_written < 0) {
         pr_err("<<klimem>> access_process_vm (write) failed\n");
-    } else {
-        pr_info("<<klimem>> Wrote %d bytes to process %d at address 0x%lx\n",
-                bytes_written, reader_pid, proc_addr);
     }
     kfree(procs);
     mmput(reader_mm);
@@ -244,19 +236,12 @@ static int ReadProcessMemory(struct T_RPM args) {
         return -EFAULT;
     }
 
-    pr_info("<<klimem>> Read %d bytes from process %d at address 0x%lx\n",
-            bytes_read, args.target_pid, args.target_address);
-
     // Write the data to the reader process
     bytes_written = access_process_vm(reader_task, args.buffer_address, buffer,
                                       bytes_read, FOLL_WRITE);
     if (bytes_written < 0) {
         pr_err("<<klimem>> access_process_vm (write) failed\n");
-    } else {
-        pr_info("<<klimem>> Wrote %d bytes to process %d at address 0x%lx\n",
-                bytes_written, reader_pid, args.buffer_address);
     }
-
     // Cleanup
     kfree(buffer);
     mmput(target_mm);
