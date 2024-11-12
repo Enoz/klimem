@@ -51,6 +51,20 @@ int main() {
                procs->processes[i].name);
     }
 
+    printf("Testing GetModules::\n");
+    struct T_MODULE_REQUEST modReq;
+    modReq.pid = getpid();
+
+    struct T_MODULES *mods =
+        (struct T_MODULES *)malloc(sizeof(struct T_MODULES));
+    modReq.buffer_address = (unsigned long)mods;
+
+    if (ioctl(fd, IOCTL_GET_MODULES, &modReq) < 0) {
+        perror("IOCTL GET MODS failed");
+        close(fd);
+        return -1;
+    }
+
     close(fd);
     return 0;
 }

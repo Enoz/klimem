@@ -4,6 +4,7 @@
 #include <linux/cdev.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/maple_tree.h>
 #include <linux/mm.h>
 #include <linux/mm_types.h>
 #include <linux/module.h>
@@ -22,6 +23,72 @@ MODULE_DESCRIPTION("Kaylee mem");
 // Device variables
 static int major;
 static struct cdev my_cdev;
+
+static int ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
+    struct task_struct *task;
+    struct mm_struct *mm;
+    struct vm_area_struct *vma;
+    unsigned long index = 0; // Start at the beginning of the tree
+
+    // Find the task for the given PID
+    task = get_pid_task(find_get_pid(mod_req.pid), PIDTYPE_PID);
+    if (!task) {
+        pr_err("<<klimem>> Could not find task for PID %d\n", mod_req.pid);
+        return -ESRCH;
+    }
+
+    mm = get_task_mm(task);
+    if (!mm) {
+        pr_err("<<klimem>> Could not access memory map for PID %d\n",
+               mod_req.pid);
+        put_task_struct(task);
+        return -EFAULT;
+    }
+
+    pr_info("<<klimem>> Listing modules for PID %d:\n", mod_req.pid);
+
+    // Traverse the maple_tree for VMAs
+    down_read(&mm->mmap_lock);
+    while ((vma = mt_find(&mm->mm_mt, &index, ULONG_MAX))) {
+        if (vma->vm_file) {
+            char *path_buf;
+            char *path;
+
+            // Allocate a buffer for the file path
+            path_buf = kmalloc(PATH_MAX, GFP_KERNEL);
+            if (!path_buf) {
+                pr_err(
+                    "<<klimem>> Failed to allocate memory for path buffer\n");
+                up_read(&mm->mmap_lock);
+                mmput(mm);
+                put_task_struct(task);
+                return -ENOMEM;
+            }
+
+            // Get the file path of the mapped region
+            path = d_path(&vma->vm_file->f_path, path_buf, PATH_MAX);
+            if (IS_ERR(path)) {
+                pr_err("<<klimem>> Failed to get path for module\n");
+                kfree(path_buf);
+                continue;
+            }
+
+            // Print base address, end address, and module path
+            pr_info("<<klimem>> Base: 0x%lx, End: 0x%lx, Module: %s\n",
+                    vma->vm_start, vma->vm_end, path);
+
+            kfree(path_buf);
+        }
+
+        // Move `index` forward to continue traversal
+        index = vma->vm_end;
+    }
+    up_read(&mm->mmap_lock);
+
+    mmput(mm);
+    put_task_struct(task);
+    return 0;
+}
 
 static void GetProcesses(unsigned long proc_addr) {
     struct T_PROCESSES *procs = kmalloc(sizeof(struct T_PROCESSES), GFP_KERNEL);
@@ -52,7 +119,6 @@ static void GetProcesses(unsigned long proc_addr) {
         if (procs->numProcesses == MAX_PROCESSES_READ) {
             break;
         }
-        pr_info("<<klimem>> %i, %s\n", task->pid, task->comm);
         procs->processes[procs->numProcesses].pid = task->pid;
         strncpy(procs->processes[procs->numProcesses].name, task->comm,
                 sizeof(procs->processes[procs->numProcesses].name));
@@ -168,16 +234,13 @@ static long ioctl_handler(struct file *file, unsigned int cmd,
 
     struct T_RPM rpm_val;
     unsigned long get_proc_buffer;
+    struct T_MODULE_REQUEST mod_req;
 
     switch (cmd) {
     case IOCTL_RPM:
         if (copy_from_user(&rpm_val, (int __user *)arg, sizeof(struct T_RPM))) {
             return -EFAULT;
         }
-        printk(KERN_INFO "RPM Receieved (Caller PID %i) (PID %i, target addr "
-                         "%lx, size %zu, local buff %lx)",
-               current->pid, rpm_val.target_pid, rpm_val.target_address,
-               rpm_val.read_size, rpm_val.buffer_address);
         ReadProcessMemory(rpm_val);
         break;
     case IOCTL_GET_PROCESSES:
@@ -186,8 +249,14 @@ static long ioctl_handler(struct file *file, unsigned int cmd,
             return -EFAULT;
         }
 
-        pr_info("Got %lul from req\n", get_proc_buffer);
         GetProcesses(get_proc_buffer);
+        break;
+    case IOCTL_GET_MODULES:
+        if (copy_from_user(&mod_req, (int __user *)arg,
+                           sizeof(struct T_MODULE_REQUEST))) {
+            return -EFAULT;
+        }
+        ListModulesForProcess(mod_req);
         break;
 
     default:
