@@ -64,6 +64,11 @@ int main() {
         close(fd);
         return -1;
     }
+    printf("Found %i modules\n", mods->numModules);
+    for (int i = 0; i < mods->numModules; i++) {
+        printf("(%lx - %lx) %s\n", mods->modules[i].start, mods->modules[i].end,
+               mods->modules[i].path);
+    }
 
     close(fd);
     return 0;

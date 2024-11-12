@@ -24,7 +24,8 @@ MODULE_DESCRIPTION("Kaylee mem");
 static int major;
 static struct cdev my_cdev;
 
-static int ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
+static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
+    struct T_MODULES *mods = kmalloc(sizeof(struct T_MODULES), GFP_KERNEL);
     struct task_struct *task;
     struct mm_struct *mm;
     struct vm_area_struct *vma;
@@ -34,7 +35,7 @@ static int ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
     task = get_pid_task(find_get_pid(mod_req.pid), PIDTYPE_PID);
     if (!task) {
         pr_err("<<klimem>> Could not find task for PID %d\n", mod_req.pid);
-        return -ESRCH;
+        return;
     }
 
     mm = get_task_mm(task);
@@ -42,7 +43,7 @@ static int ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
         pr_err("<<klimem>> Could not access memory map for PID %d\n",
                mod_req.pid);
         put_task_struct(task);
-        return -EFAULT;
+        return;
     }
 
     pr_info("<<klimem>> Listing modules for PID %d:\n", mod_req.pid);
@@ -62,7 +63,8 @@ static int ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
                 up_read(&mm->mmap_lock);
                 mmput(mm);
                 put_task_struct(task);
-                return -ENOMEM;
+                kfree(mods);
+                return;
             }
 
             // Get the file path of the mapped region
@@ -72,11 +74,16 @@ static int ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
                 kfree(path_buf);
                 continue;
             }
+            mods->modules[mods->numModules].start = vma->vm_start;
+            mods->modules[mods->numModules].end = vma->vm_end;
+            strncpy(mods->modules[mods->numModules].path, path,
+                    sizeof(mods->modules[mods->numModules].path));
 
             // Print base address, end address, and module path
             pr_info("<<klimem>> Base: 0x%lx, End: 0x%lx, Module: %s\n",
                     vma->vm_start, vma->vm_end, path);
 
+            mods->numModules++;
             kfree(path_buf);
         }
 
@@ -87,7 +94,43 @@ static int ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
 
     mmput(mm);
     put_task_struct(task);
-    return 0;
+    
+    // Write to user
+
+    pid_t reader_pid = current->pid;
+    struct task_struct *reader_task;
+    struct mm_struct *reader_mm;
+    // Locate the reader task
+    reader_task = get_pid_task(find_get_pid(reader_pid), PIDTYPE_PID);
+    if (!reader_task) {
+        pr_err("<<klimem>> Could not find reader task for PID %d\n",
+               reader_pid);
+        kfree(mods);
+        return;
+    }
+
+    reader_mm = get_task_mm(reader_task);
+    if (!reader_mm) {
+        pr_err("<<klimem>> Could not access reader map for target PID %d\n",
+               reader_pid);
+        put_task_struct(reader_task);
+        kfree(mods);
+        return;
+    }
+
+
+    int bytes_written = access_process_vm(
+        reader_task, mod_req.buffer_address, mods, sizeof(struct T_MODULES), FOLL_WRITE);
+    if (bytes_written < 0) {
+        pr_err("<<klimem>> access_process_vm (write) failed\n");
+    } else {
+        pr_info("<<klimem>> Wrote %d bytes to process %d at address 0x%lx\n",
+                bytes_written, reader_pid, mod_req.buffer_address);
+    }
+    mmput(reader_mm);
+    put_task_struct(reader_task);
+    kfree(mods);
+    return ;
 }
 
 static void GetProcesses(unsigned long proc_addr) {
