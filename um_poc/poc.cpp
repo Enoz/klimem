@@ -39,17 +39,16 @@ int main() {
     printf("Testing GetProcesses::\n");
     struct T_PROCESSES *procs =
         (struct T_PROCESSES *)malloc(sizeof(struct T_PROCESSES));
-    if (ioctl(fd, IOCTL_GET_PROCESSES, procs) < 0) {
+    if (ioctl(fd, IOCTL_GET_PROCESSES, (unsigned long)(&procs)) < 0) {
         perror("IOCTL GET PROCS failed");
         close(fd);
         return -1;
     }
-    printf("Found %i processes\n", procs->numProcesses);
 
+    printf("Found %i processes\n", procs->numProcesses);
     for (int i = 0; i < procs->numProcesses; i++) {
         printf("Proc %i: PID-%i Name: %s\n", i, procs->processes[i].pid,
                procs->processes[i].name);
-
     }
 
     close(fd);

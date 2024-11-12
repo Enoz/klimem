@@ -1,4 +1,5 @@
 #include "linux/gfp_types.h"
+#include "linux/printk.h"
 #include "linux/sched/signal.h"
 #include <linux/cdev.h>
 #include <linux/init.h>
@@ -51,15 +52,21 @@ static void GetProcesses(unsigned long proc_addr) {
         if (procs->numProcesses == MAX_PROCESSES_READ) {
             break;
         }
+        pr_info("<<klimem>> %i, %s\n", task->pid, task->comm);
         procs->processes[procs->numProcesses].pid = task->pid;
         strncpy(procs->processes[procs->numProcesses].name, task->comm,
                 sizeof(procs->processes[procs->numProcesses].name));
         procs->numProcesses++;
     }
 
-    access_process_vm(reader_task, proc_addr, procs, sizeof(struct T_PROCESSES),
-                      FOLL_WRITE);
-
+    int bytes_written = access_process_vm(
+        reader_task, proc_addr, procs, sizeof(struct T_PROCESSES), FOLL_WRITE);
+    if (bytes_written < 0) {
+        pr_err("<<klimem>> access_process_vm (write) failed\n");
+    } else {
+        pr_info("<<klimem>> Wrote %d bytes to process %d at address 0x%lx\n",
+                bytes_written, reader_pid, proc_addr);
+    }
     kfree(procs);
     mmput(reader_mm);
     put_task_struct(reader_task);
@@ -178,6 +185,8 @@ static long ioctl_handler(struct file *file, unsigned int cmd,
                            sizeof(unsigned long))) {
             return -EFAULT;
         }
+
+        pr_info("Got %lul from req\n", get_proc_buffer);
         GetProcesses(get_proc_buffer);
         break;
 
