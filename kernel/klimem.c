@@ -1,3 +1,4 @@
+#include "linux/gfp_types.h"
 #include "linux/sched/signal.h"
 #include <linux/cdev.h>
 #include <linux/init.h>
@@ -21,20 +22,48 @@ MODULE_DESCRIPTION("Kaylee mem");
 static int major;
 static struct cdev my_cdev;
 
-static struct T_PROCESSES GetProcesses(void) {
-    struct T_PROCESSES procs;
+static void GetProcesses(unsigned long proc_addr) {
+    struct T_PROCESSES *procs = kmalloc(sizeof(struct T_PROCESSES), GFP_KERNEL);
 
-    procs.numProcesses = 0;
+    pid_t reader_pid = current->pid;
+    struct task_struct *reader_task;
+    struct mm_struct *reader_mm;
+    // Locate the reader task
+    reader_task = get_pid_task(find_get_pid(reader_pid), PIDTYPE_PID);
+    if (!reader_task) {
+        pr_err("<<klimem>> Could not find reader task for PID %d\n",
+               reader_pid);
+        kfree(procs);
+        return;
+    }
+
+    reader_mm = get_task_mm(reader_task);
+    if (!reader_mm) {
+        pr_err("<<klimem>> Could not access reader map for target PID %d\n",
+               reader_pid);
+        put_task_struct(reader_task);
+        kfree(procs);
+        return;
+    }
+    procs->numProcesses = 0;
     struct task_struct *task;
     for_each_process(task) {
-        if (procs.numProcesses == MAX_PROCESSES_READ) {
+        if (procs->numProcesses == MAX_PROCESSES_READ) {
             break;
         }
-        procs.processes[procs.numProcesses].pid = task->pid;
-        strncpy(procs.processes[procs.numProcesses].name, task->comm, sizeof(procs.processes[procs.numProcesses].name));
-        procs.numProcesses++;
+        procs->processes[procs->numProcesses].pid = task->pid;
+        strncpy(procs->processes[procs->numProcesses].name, task->comm,
+                sizeof(procs->processes[procs->numProcesses].name));
+        procs->numProcesses++;
     }
-    return procs;
+
+    access_process_vm(reader_task, proc_addr, procs, sizeof(struct T_PROCESSES),
+                      FOLL_WRITE);
+
+    kfree(procs);
+    mmput(reader_mm);
+    put_task_struct(reader_task);
+    return;
 }
 
 static int ReadProcessMemory(struct T_RPM args) {
@@ -131,7 +160,7 @@ static long ioctl_handler(struct file *file, unsigned int cmd,
                           unsigned long arg) {
 
     struct T_RPM rpm_val;
-    struct T_PROCESSES procs;
+    unsigned long get_proc_buffer;
 
     switch (cmd) {
     case IOCTL_RPM:
@@ -144,13 +173,12 @@ static long ioctl_handler(struct file *file, unsigned int cmd,
                rpm_val.read_size, rpm_val.buffer_address);
         ReadProcessMemory(rpm_val);
         break;
-
     case IOCTL_GET_PROCESSES:
-        procs = GetProcesses();
-        if (copy_to_user((int __user *)arg, &procs,
-                         sizeof(struct T_PROCESSES))) {
+        if (copy_from_user(&get_proc_buffer, (int __user *)arg,
+                           sizeof(unsigned long))) {
             return -EFAULT;
         }
+        GetProcesses(get_proc_buffer);
         break;
 
     default:

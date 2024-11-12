@@ -12,7 +12,7 @@
 #define DEVICE_NAME "/dev/klimem_dev"
 #define MY_IOCTL_MAGIC 'k'
 #define IOCTL_RPM _IOW(MY_IOCTL_MAGIC, 1, struct T_RPM)
-#define IOCTL_GET_PROCESSES _IOR(MY_IOCTL_MAGIC, 2, struct T_PROCESSES)
+#define IOCTL_GET_PROCESSES _IOW(MY_IOCTL_MAGIC, 2, unsigned long)
 
 struct T_RPM {
     pid_t target_pid;

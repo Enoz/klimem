@@ -36,19 +36,20 @@ int main() {
 
     printf("Value in readVal (0x%lx): %i\n", (unsigned long)readVal, *readVal);
 
-
-
     printf("Testing GetProcesses::\n");
-    struct T_PROCESSES procVal;
-    if (ioctl(fd, IOCTL_GET_PROCESSES, &procVal) < 0) {
+    struct T_PROCESSES *procs =
+        (struct T_PROCESSES *)malloc(sizeof(struct T_PROCESSES));
+    if (ioctl(fd, IOCTL_GET_PROCESSES, procs) < 0) {
         perror("IOCTL GET PROCS failed");
         close(fd);
         return -1;
     }
-    printf("Found %i processes\n", procVal.numProcesses);
-    
-    for(int i = 0; i < procVal.numProcesses; i++) {
-        printf("Proc %i: PID-%i Name: %s\n", i, procVal.processes[i].pid, procVal.processes[i].name);
+    printf("Found %i processes\n", procs->numProcesses);
+
+    for (int i = 0; i < procs->numProcesses; i++) {
+        printf("Proc %i: PID-%i Name: %s\n", i, procs->processes[i].pid,
+               procs->processes[i].name);
+
     }
 
     close(fd);
