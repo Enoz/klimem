@@ -26,15 +26,21 @@ static struct cdev my_cdev;
 
 static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
     struct T_MODULES *mods = kmalloc(sizeof(struct T_MODULES), GFP_KERNEL);
+    if (!mods) {
+        pr_err("<<klimem>> Failed to allocate memory for T_MODULES struct\n");
+        return;
+    }
+
     struct task_struct *task;
     struct mm_struct *mm;
     struct vm_area_struct *vma;
-    unsigned long index = 0; // Start at the beginning of the tree
+    unsigned long index = 0;
 
     // Find the task for the given PID
     task = get_pid_task(find_get_pid(mod_req.pid), PIDTYPE_PID);
     if (!task) {
         pr_err("<<klimem>> Could not find task for PID %d\n", mod_req.pid);
+        kfree(mods);
         return;
     }
 
@@ -43,10 +49,11 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
         pr_err("<<klimem>> Could not access memory map for PID %d\n",
                mod_req.pid);
         put_task_struct(task);
+        kfree(mods);
         return;
     }
 
-    // Traverse the maple_tree for VMAs
+    // Traverse the maple tree for VMAs
     down_read(&mm->mmap_lock);
     while ((vma = mt_find(&mm->mm_mt, &index, ULONG_MAX))) {
         if (vma->vm_file) {
@@ -72,13 +79,20 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
                 kfree(path_buf);
                 continue;
             }
-            mods->modules[mods->numModules].start = vma->vm_start;
-            mods->modules[mods->numModules].end = vma->vm_end;
+
+            // Safely copy the path and ensure it fits in the destination buffer
             strncpy(mods->modules[mods->numModules].path, path,
                     sizeof(mods->modules[mods->numModules].path));
 
-            mods->numModules++;
+            // Set start and end virtual memory addresses
+            mods->modules[mods->numModules].start = vma->vm_start;
+            mods->modules[mods->numModules].end = vma->vm_end;
+
             kfree(path_buf);
+            mods->numModules++;
+            if (mods->numModules >= MAX_MODULES) {
+                break;
+            }
         }
 
         // Move `index` forward to continue traversal
@@ -90,10 +104,10 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
     put_task_struct(task);
 
     // Write to user
-
     pid_t reader_pid = current->pid;
     struct task_struct *reader_task;
     struct mm_struct *reader_mm;
+
     // Locate the reader task
     reader_task = get_pid_task(find_get_pid(reader_pid), PIDTYPE_PID);
     if (!reader_task) {
@@ -112,16 +126,17 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
         return;
     }
 
+    // Attempt to write the module information back to user space
     int bytes_written =
         access_process_vm(reader_task, mod_req.buffer_address, mods,
                           sizeof(struct T_MODULES), FOLL_WRITE);
     if (bytes_written < 0) {
         pr_err("<<klimem>> access_process_vm (write) failed\n");
     }
+
     mmput(reader_mm);
     put_task_struct(reader_task);
     kfree(mods);
-    return;
 }
 
 static void GetProcesses(unsigned long proc_addr) {
