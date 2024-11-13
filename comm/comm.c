@@ -9,7 +9,7 @@
 #endif /* ifndef KERNEL_SPACE */
 
 #define MAX_PROCESSES_READ 1024
-#define MAX_MODULES 96
+#define MAX_MODULES 2048
 #define DEVICE_NAME "/dev/klimem_dev"
 #define MY_IOCTL_MAGIC 'k'
 #define IOCTL_RPM _IOW(MY_IOCTL_MAGIC, 1, struct T_RPM)
@@ -45,7 +45,7 @@ struct T_MODULE_REQUEST {
 struct T_MODULE {
     unsigned long start;
     unsigned long end;
-    char path[1024];
+    char path[512];
 };
 struct T_MODULES {
     unsigned int numModules;

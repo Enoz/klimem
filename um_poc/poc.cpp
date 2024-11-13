@@ -26,7 +26,7 @@ int main() {
     printf("CS2 pid: %i\n", cs2_pid);
 
     auto modules = kmem->GetProcessModules(cs2_pid);
-    printf("Found %i modules", modules->numModules);
+    printf("Found %i modules\n", modules->numModules);
     for (int i = 0; i < modules->numModules; i++) {
         auto mod = modules->modules[i];
         printf("(%p - %p) %s\n", (void *)mod.start, (void *)mod.end, mod.path);
