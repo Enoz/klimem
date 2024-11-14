@@ -32,5 +32,8 @@ int main() {
         printf("(%p - %p) %s\n", (void *)mod.start, (void *)mod.end, mod.path);
     }
 
+    void* libclientbase = kmem->GetModuleBase(cs2_pid, "libclient.so");
+    printf("libclient.so base: %p\n", libclientbase);
+
     return 0;
 }

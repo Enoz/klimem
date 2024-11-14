@@ -1,7 +1,9 @@
 #include "./comm.c"
+#include <algorithm>
 #include <memory>
-#include <unistd.h>
 #include <string>
+#include <unistd.h>
+#include <vector>
 
 namespace KLiMem {
 class Memory {
@@ -52,13 +54,22 @@ class Memory {
         return mods;
     }
 
-    void* GetModuleBase(pid_t pid, std::string moduleName) {
+    void *GetModuleBase(pid_t pid, std::string moduleName) {
         auto mods = GetProcessModules(pid);
-        for(int i = 0; i < mods->numModules; i++) {
+        auto modVec = std::vector<T_MODULE>();
+        for (int i = 0; i < mods->numModules; i++) {
             auto str = std::string(mods->modules[i].path);
+            if (str.find(moduleName) != std::string::npos) {
+                modVec.push_back(mods->modules[i]);
+            }
         }
-    }
 
+        if (modVec.size() == 0)
+            return 0;
+        std::sort(modVec.begin(), modVec.end(),
+                  [](T_MODULE a, T_MODULE b) { return a.start < b.start; });
+        return (void *)modVec[0].start;
+    }
 };
 
 }; // namespace KLiMem
