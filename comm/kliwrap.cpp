@@ -1,6 +1,7 @@
 #include "./comm.c"
 #include <memory>
-#include <iostream>
+#include <unistd.h>
+#include <string>
 
 namespace KLiMem {
 class Memory {
@@ -48,9 +49,16 @@ class Memory {
         if (ioctl(fd, IOCTL_GET_MODULES, &modReq) < 0) {
             throw "KLiMem failed to read module maps";
         }
-
         return mods;
     }
+
+    void* GetModuleBase(pid_t pid, std::string moduleName) {
+        auto mods = GetProcessModules(pid);
+        for(int i = 0; i < mods->numModules; i++) {
+            auto str = std::string(mods->modules[i].path);
+        }
+    }
+
 };
 
 }; // namespace KLiMem
