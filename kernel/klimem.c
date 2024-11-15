@@ -12,6 +12,7 @@
 #include <linux/sched/task.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
+#include <linux/vmalloc.h>
 
 #define KERNEL_SPACE
 #include "../comm/comm.c"
@@ -25,7 +26,8 @@ static int major;
 static struct cdev my_cdev;
 
 static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
-    struct T_MODULES *mods = kmalloc(sizeof(struct T_MODULES), GFP_KERNEL);
+    struct T_MODULES *mods =
+        (struct T_MODULES *)vmalloc(sizeof(struct T_MODULES));
     if (!mods) {
         pr_err("<<klimem>> Failed to allocate memory for T_MODULES struct\n");
         return;
@@ -40,7 +42,7 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
     task = get_pid_task(find_get_pid(mod_req.pid), PIDTYPE_PID);
     if (!task) {
         pr_err("<<klimem>> Could not find task for PID %d\n", mod_req.pid);
-        kfree(mods);
+        vfree(mods);
         return;
     }
 
@@ -49,7 +51,7 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
         pr_err("<<klimem>> Could not access memory map for PID %d\n",
                mod_req.pid);
         put_task_struct(task);
-        kfree(mods);
+        vfree(mods);
         return;
     }
 
@@ -61,14 +63,14 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
             char *path;
 
             // Allocate a buffer for the file path
-            path_buf = kmalloc(PATH_MAX, GFP_KERNEL);
+            path_buf = (char *)vmalloc(PATH_MAX);
             if (!path_buf) {
                 pr_err(
                     "<<klimem>> Failed to allocate memory for path buffer\n");
                 up_read(&mm->mmap_lock);
                 mmput(mm);
                 put_task_struct(task);
-                kfree(mods);
+                vfree(mods);
                 return;
             }
 
@@ -76,7 +78,7 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
             path = d_path(&vma->vm_file->f_path, path_buf, PATH_MAX);
             if (IS_ERR(path)) {
                 pr_err("<<klimem>> Failed to get path for module\n");
-                kfree(path_buf);
+                vfree(path_buf);
                 continue;
             }
 
@@ -88,7 +90,7 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
             mods->modules[mods->numModules].start = vma->vm_start;
             mods->modules[mods->numModules].end = vma->vm_end;
 
-            kfree(path_buf);
+            vfree(path_buf);
             mods->numModules++;
             if (mods->numModules >= MAX_MODULES) {
                 break;
@@ -113,7 +115,7 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
     if (!reader_task) {
         pr_err("<<klimem>> Could not find reader task for PID %d\n",
                reader_pid);
-        kfree(mods);
+        vfree(mods);
         return;
     }
 
@@ -122,7 +124,7 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
         pr_err("<<klimem>> Could not access reader map for target PID %d\n",
                reader_pid);
         put_task_struct(reader_task);
-        kfree(mods);
+        vfree(mods);
         return;
     }
 
@@ -136,11 +138,12 @@ static void ListModulesForProcess(struct T_MODULE_REQUEST mod_req) {
 
     mmput(reader_mm);
     put_task_struct(reader_task);
-    kfree(mods);
+    vfree(mods);
 }
 
 static void GetProcesses(unsigned long proc_addr) {
-    struct T_PROCESSES *procs = kmalloc(sizeof(struct T_PROCESSES), GFP_KERNEL);
+    struct T_PROCESSES *procs =
+        (struct T_PROCESSES *)vmalloc(sizeof(struct T_PROCESSES));
 
     pid_t reader_pid = current->pid;
     struct task_struct *reader_task;
@@ -150,7 +153,7 @@ static void GetProcesses(unsigned long proc_addr) {
     if (!reader_task) {
         pr_err("<<klimem>> Could not find reader task for PID %d\n",
                reader_pid);
-        kfree(procs);
+        vfree(procs);
         return;
     }
 
@@ -159,7 +162,7 @@ static void GetProcesses(unsigned long proc_addr) {
         pr_err("<<klimem>> Could not access reader map for target PID %d\n",
                reader_pid);
         put_task_struct(reader_task);
-        kfree(procs);
+        vfree(procs);
         return;
     }
     procs->numProcesses = 0;
@@ -179,7 +182,7 @@ static void GetProcesses(unsigned long proc_addr) {
     if (bytes_written < 0) {
         pr_err("<<klimem>> access_process_vm (write) failed\n");
     }
-    kfree(procs);
+    vfree(procs);
     mmput(reader_mm);
     put_task_struct(reader_task);
     return;
@@ -228,7 +231,7 @@ static int ReadProcessMemory(struct T_RPM args) {
     }
 
     // Allocate kernel buffer for reading data
-    buffer = kmalloc(args.read_size, GFP_KERNEL);
+    buffer = (char *)vmalloc(args.read_size);
     if (!buffer) {
         pr_err("<<klimem>> Failed to allocate buffer\n");
         mmput(target_mm);
@@ -243,7 +246,7 @@ static int ReadProcessMemory(struct T_RPM args) {
                                    args.read_size, FOLL_FORCE);
     if (bytes_read < 0) {
         pr_err("<<klimem>> access_process_vm (read) failed\n");
-        kfree(buffer);
+        vfree(buffer);
         mmput(target_mm);
         mmput(reader_mm);
         put_task_struct(target_task);
@@ -258,7 +261,7 @@ static int ReadProcessMemory(struct T_RPM args) {
         pr_err("<<klimem>> access_process_vm (write) failed\n");
     }
     // Cleanup
-    kfree(buffer);
+    vfree(buffer);
     mmput(target_mm);
     mmput(reader_mm);
     put_task_struct(target_task);
